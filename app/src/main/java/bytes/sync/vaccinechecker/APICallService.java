@@ -16,8 +16,10 @@ import com.google.gson.Gson;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -184,17 +186,21 @@ public class APICallService extends Service {
 
                 if(availableMap.size() > 0) {
                     Log.d(TAG, "availableMap size is: "+availableMap.size());
-                    saveAvailableMap(availableMap);
+                    Map<String, List<Session>> existingMap = readAvailableMap();
+                    if(existingMap != null && !availableMap.equals(existingMap)) {
+                        saveAvailableMap(availableMap);
 
-                    if(mediaPlayer != null) {
-                        mediaPlayer.release();
+                        if(mediaPlayer != null) {
+                            mediaPlayer.release();
+                        }
+                        mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.sound);
+                        mediaPlayer.setLooping(true);
+                        mediaPlayer.setVolume(1.0f,1.0f);
+                        mediaPlayer.start();
+
+                        notificationManager.notify(1, notification);
                     }
-                    mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.sound);
-                    mediaPlayer.setLooping(true);
-                    mediaPlayer.setVolume(1.0f,1.0f);
-                    mediaPlayer.start();
-
-                    notificationManager.notify(1, notification);
+                    Log.d(TAG, "no new data available");
                 }
             }
         });
@@ -214,6 +220,17 @@ public class APICallService extends Service {
             Log.e(TAG, e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private Map<String, List<Session>> readAvailableMap() {
+        try {
+            FileInputStream fileInputStream = openFileInput("available_map");
+            ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+            return (Map<String, List<Session>>) objectInputStream.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            Log.e(TAG, e.getMessage());
+        }
+        return null;
     }
 
     private void updateValues(Intent intent) {

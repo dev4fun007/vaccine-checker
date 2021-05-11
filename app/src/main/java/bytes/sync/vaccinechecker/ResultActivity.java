@@ -43,9 +43,13 @@ public class ResultActivity extends AppCompatActivity {
                 .setPrettyPrinting()
                 .create();
         Map<String, List<Session>> stringListMap = readAvailableMap();
-        Log.d(TAG, "stringListMap size: " + stringListMap.size());
-        String jsonString = gson.toJson(stringListMap);
-        textView.setText(jsonString);
+        if(stringListMap != null && stringListMap.size() > 0) {
+            String jsonString = gson.toJson(stringListMap);
+            textView.setText(jsonString);
+        } else {
+            textView.setText("Vaccine availability is 0");
+        }
+
     }
 
     @Override
