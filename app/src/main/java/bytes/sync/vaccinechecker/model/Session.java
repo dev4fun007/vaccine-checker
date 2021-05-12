@@ -1,5 +1,7 @@
 package bytes.sync.vaccinechecker.model;
 
+import androidx.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -59,4 +61,5 @@ public class Session implements Serializable {
     public void setSlots(List<String> slots) {
         this.slots = slots;
     }
+
 }

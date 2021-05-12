@@ -5,9 +5,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ContentResolver;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
@@ -21,7 +25,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.text.SimpleDateFormat;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,8 +106,8 @@ public class APICallService extends Service {
             stopSelf();
         } else if("MUSIC_ACTION_STOP".equals(action)) {
             if(mediaPlayer != null) {
-                mediaPlayer.stop();
                 mediaPlayer.release();
+                mediaPlayer = null;
             }
         }
 
@@ -115,16 +124,25 @@ public class APICallService extends Service {
         super.onDestroy();
         if(mediaPlayer != null) {
             mediaPlayer.release();
+            mediaPlayer = null;
         }
     }
 
     private void createNotificationChannel() {
         NotificationChannel notificationChannel = new NotificationChannel("CHANNEL_ID_1", "Vaccine Status Check", NotificationManager.IMPORTANCE_HIGH);
+        notificationChannel.setVibrationPattern(new long[]{1000});
+        Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build();
+        notificationChannel.setSound(soundUri, audioAttributes);
         notificationManager.createNotificationChannel(notificationChannel);
     }
 
     private Notification createNotification() {
         Intent intent = new Intent(getApplicationContext(), ResultActivity.class);
+        intent.setAction("MUSIC_ACTION_STOP");
         PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         Notification.Builder builder = new Notification.Builder(this, "CHANNEL_ID_1")
@@ -135,7 +153,7 @@ public class APICallService extends Service {
                 .setContentIntent(pendingIntent)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setOngoing(true)
-                .setAutoCancel(true);
+                .setAutoCancel(false);
 
         return builder.build();
     }
@@ -166,10 +184,13 @@ public class APICallService extends Service {
                 String responseBody = response.body().string();
                 Log.d(TAG, responseBody);
                 Centers centers = gson.fromJson(responseBody, Centers.class);
+                if(centers == null || centers.getCenters() == null){
+                    return;
+                }
                 Map<String, List<Session>> availableMap = new HashMap<>();
                 for(Center center:centers.getCenters()) {
                     for(Session session:center.getSessions()) {
-                        if(session.getAvailable_capacity() > 0 && session.getMin_age_limit() >= minAgeLimit) {
+                        if(session.getAvailable_capacity() == 0 && session.getMin_age_limit() >= minAgeLimit && session.getMin_age_limit() < 45) {
                             Log.d(TAG,"vaccine are available and pass min age limit");
                             List<Session> sessionList = availableMap.get(center.getName());
                             if(sessionList != null) {
@@ -187,20 +208,19 @@ public class APICallService extends Service {
                 if(availableMap.size() > 0) {
                     Log.d(TAG, "availableMap size is: "+availableMap.size());
                     Map<String, List<Session>> existingMap = readAvailableMap();
-                    if(existingMap != null && !availableMap.equals(existingMap)) {
+                    if(existingMap != null && !isNewMapSame(availableMap,existingMap)) {
+                        Log.d(TAG, "new results different than old ones");
                         saveAvailableMap(availableMap);
-
-                        if(mediaPlayer != null) {
-                            mediaPlayer.release();
+                        if(mediaPlayer == null) {
+                            mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.sound);
+                            mediaPlayer.setLooping(true);
+                            mediaPlayer.setVolume(1, 1);
+                            mediaPlayer.start();
                         }
-                        mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.sound);
-                        mediaPlayer.setLooping(true);
-                        mediaPlayer.setVolume(1.0f,1.0f);
-                        mediaPlayer.start();
-
                         notificationManager.notify(1, notification);
+                    } else {
+                        Log.d(TAG, "no new data available");
                     }
-                    Log.d(TAG, "no new data available");
                 }
             }
         });
@@ -230,11 +250,26 @@ public class APICallService extends Service {
         } catch (IOException | ClassNotFoundException e) {
             Log.e(TAG, e.getMessage());
         }
-        return null;
+        return new HashMap<>();
+    }
+
+    private boolean isNewMapSame(Map<String, List<Session>> newMap, Map<String, List<Session>> oldMap) {
+        String newJson = gson.toJson(newMap);
+        String oldJson = gson.toJson(oldMap);
+        return newJson.equals(oldJson);
     }
 
     private void updateValues(Intent intent) {
-        date = intent.getStringExtra("DATE").isEmpty() ? date : intent.getStringExtra("DATE");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        Calendar c = Calendar.getInstance();
+        c.setTime(new Date());
+        c.add(Calendar.DATE, 1);
+        Date nextDay = c.getTime();
+        Log.d(TAG,"date to check for vaccine: " + nextDay.toString());
+        String nextDate = simpleDateFormat.format(nextDay);
+        date = intent.getStringExtra("DATE").isEmpty() ? nextDate : intent.getStringExtra("DATE");
+        Log.d(TAG,"date to check for vaccine: " + date);
+
         delay = intent.getLongExtra("DELAY", delay) * 1000;
         minAgeLimit = intent.getIntExtra("MIN_AGE_LIMIT", minAgeLimit);
         districtId = intent.getStringExtra("DISTRICT_ID").isEmpty() ? districtId : intent.getStringExtra("DISTRICT_ID");

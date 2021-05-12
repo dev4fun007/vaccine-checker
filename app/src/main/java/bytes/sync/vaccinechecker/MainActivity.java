@@ -34,6 +34,9 @@ public class MainActivity extends AppCompatActivity {
             intent.putExtra("DELAY", Long.parseLong(minDelay));
             startService(intent);
             Toast.makeText(this, "availability checker service started", Toast.LENGTH_LONG).show();
+
+//            Intent activityIntent = new Intent(this, ResultActivity.class);
+//            startActivity(activityIntent);
         });
 
     }

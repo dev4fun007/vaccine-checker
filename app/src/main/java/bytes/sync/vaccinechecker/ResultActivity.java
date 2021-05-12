@@ -47,14 +47,14 @@ public class ResultActivity extends AppCompatActivity {
             String jsonString = gson.toJson(stringListMap);
             textView.setText(jsonString);
         } else {
-            textView.setText("Vaccine availability is 0");
+            textView.setText("Vaccine availability is 0, please wait for the next result!");
         }
-
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+
         Intent intent = new Intent(this, APICallService.class);
         intent.setAction("MUSIC_ACTION_STOP");
         startService(intent);
