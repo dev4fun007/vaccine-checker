@@ -190,7 +190,7 @@ public class APICallService extends Service {
                 Map<String, List<Session>> availableMap = new HashMap<>();
                 for(Center center:centers.getCenters()) {
                     for(Session session:center.getSessions()) {
-                        if(session.getAvailable_capacity() == 0 && session.getMin_age_limit() >= minAgeLimit && session.getMin_age_limit() < 45) {
+                        if(session.getAvailable_capacity() > 0 && session.getMin_age_limit() >= minAgeLimit) {
                             Log.d(TAG,"vaccine are available and pass min age limit");
                             List<Session> sessionList = availableMap.get(center.getName());
                             if(sessionList != null) {
